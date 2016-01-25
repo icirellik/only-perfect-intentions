@@ -1,5 +1,6 @@
 import { login, createRequest, hash, sessionRequest } from './request';
-import Q from 'q';
+import upperFirst from 'lodash.upperfirst';
+const Q = require('q');
 
 export function getResources() {
   return login()
@@ -20,10 +21,15 @@ export function getResources() {
           if (err) {
             throw reject(err);
           }
-          let json = JSON.parse(body);
+          let json = null;
+          try {
+            json = JSON.parse(body);
+          } catch (ex) {
+            return reject(ex);
+          }
           let results = {};
           json.forEach(response => {
-            results[response.requestClass + ':' + response.requestMethod] = response.responseData;
+            results[response.requestClass + upperFirst(response.requestMethod)] = response.responseData;
           })
           resolve(results);
         });

@@ -2,19 +2,17 @@ import { login, createRequest, hash, sessionRequest } from './request';
 import upperFirst from 'lodash.upperfirst';
 const Q = require('q');
 
-export function startProduction(buildingId, time) {
-  return Q.fcall(() => {
-      if (!buildingId) {
-        return null;
-      }
-      return login();
-    })
+export function polish(otherPlayerId, entity, entityConfig) {
+
+};
+
+export function motivate(otherPlayerId, entity, entityConfig) {
+  let building = entity;
+  building.entityConfig = entityConfig;
+  return login()
     .then(auth => {
       let { csrf, sessionId } = auth;
-      var payload = createRequest('CityProductionService', 'startProduction', [
-        buildingId,
-        time
-      ]);
+      var payload = createRequest('OtherPlayerService', 'motivate', [ building, otherPlayerId ]);
       let checksum = hash(csrf, payload);
 
       return Q.Promise((resolve, reject) => {
@@ -45,18 +43,11 @@ export function startProduction(buildingId, time) {
   });
 };
 
-export function pickupProduction(buildingIds) {
-  return Q.fcall(() => {
-      if (!buildingIds || buildingIds.length === 0) {
-        return null;
-      }
-      return login();
-    })
+export function visitPlayer(otherPlayerId) {
+  return login()
     .then(auth => {
       let { csrf, sessionId } = auth;
-      var payload = createRequest('CityProductionService', 'pickupProduction', [
-        buildingIds
-      ]);
+      var payload = createRequest('OtherPlayerService', 'visitPlayer', [ otherPlayerId ]);
       let checksum = hash(csrf, payload);
 
       return Q.Promise((resolve, reject) => {
@@ -85,4 +76,4 @@ export function pickupProduction(buildingIds) {
         });
       });
   });
-}
+};

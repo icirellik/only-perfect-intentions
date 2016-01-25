@@ -1,9 +1,11 @@
-import crypto from 'crypto';
-import Q from 'q';
-import request from 'request';
+const crypto = require('crypto');
+const Q = require('q');
+const request = require('request');
 
+// The constant required to generate the hash.
 const secret = 'forgeofempires';
 
+// Default androing headers.
 const headers = {
   'Accept': '*/*',
   'Host': 'us.forgeofempires.com',
@@ -53,7 +55,7 @@ function clientId() {
     platformVersion: 'pho',
     refMarketingId: '@and_google//us-en',
     registrationId: process.env.REGISTRATION_ID,
-    requiredBackendVersion: '1.65',
+    requiredBackendVersion: '1.66',
   };
 };
 

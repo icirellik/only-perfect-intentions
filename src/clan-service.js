@@ -1,12 +1,12 @@
 import { login, createRequest, hash, sessionRequest } from './request';
-const Q = require('q');
 import upperFirst from 'lodash.upperfirst';
+const Q = require('q');
 
-export function getData() {
+export function getOwnClanData() {
   return login()
     .then(auth => {
       let { csrf, sessionId } = auth;
-      var payload = createRequest('StartupService', 'getData', []);
+      var payload = createRequest('ClanService', 'getOwnClanData', []);
       let checksum = hash(csrf, payload);
 
       return Q.Promise((resolve, reject) => {
@@ -30,10 +30,7 @@ export function getData() {
           let results = {};
           json.forEach(response => {
             results[response.requestClass + upperFirst(response.requestMethod)] = response.responseData;
-          });
-          if (results['StartupServiceGetData']['__class__'] === 'UnsupportedClient') {
-            console.log(`${results['StartupServiceGetData'].message}`);
-          }
+          })
           resolve(results);
         });
       });
