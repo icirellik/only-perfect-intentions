@@ -1,6 +1,6 @@
 # Local Ignores
 dist/
-env.sh
+*env.sh
 .vscode
 typings/
 

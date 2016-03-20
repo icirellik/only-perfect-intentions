@@ -1,11 +1,11 @@
-import { login, createRequest, hash, sessionRequest } from './request';
 import upperFirst from 'lodash.upperfirst';
-const Q = require('q');
+import Q from 'q';
+import { createRequest, hash, login, sessionRequest } from './request';
 
 export function startProduction(buildingId, time) {
   return Q.fcall(() => {
       if (!buildingId) {
-        return null;
+        throw new Error('No building id supplied');
       }
       return login();
     })
@@ -48,7 +48,7 @@ export function startProduction(buildingId, time) {
 export function pickupProduction(buildingIds) {
   return Q.fcall(() => {
       if (!buildingIds || buildingIds.length === 0) {
-        return null;
+        throw new Error('No building id supplied');
       }
       return login();
     })

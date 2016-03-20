@@ -1,7 +1,7 @@
 import { pickupProduction, startProduction } from './city-production-service';
 import { getResources } from './city-resources-service';
 import { getOwnClanData } from './clan-service';
-import { motivate, polish, visitPlayer } from './other-player-service';
+import * as op from './other-player-service';
 import { getData } from './startup-service';
 const commander = require('commander');
 const chalk = require('chalk');
@@ -78,34 +78,67 @@ commander
   });
 
 function visit(otherPlayerId, cityEntities) {
-  return visitPlayer(otherPlayerId)
-    .then(results => {
-      let otherPlayer = {
-        buildings: {},
-        tiles: results['OtherPlayerServiceVisitPlayer'].city_map.unlocked_areas
-      };
+  return op.visitPlayer(otherPlayerId)
+    .then(otherPlayer => {
+      console.log(chalk.cyan(`\n${otherPlayer.name}(${otherPlayer.id}) with score ${otherPlayer.score}`));
 
-      results['OtherPlayerServiceVisitPlayer'].city_map.entities.forEach(building => {
-        if (!otherPlayer.buildings[building.type]) {
-          otherPlayer.buildings[building.type] = [];
+      // Residential
+      let unmotivated = [];
+      unmotivated = unmotivated.concat(otherPlayer.buildings.residential
+        .filter(building => building.motivated === false)
+        .filter(building => building.state !== op.BUILDING_STATE_PLUNDERED)
+        .filter(building => building.state !== op.BUILDING_STATE_PRODUCTION_FINISHED)
+        .filter(building => building.state !== op.BULDING_STATE_UNCONNECTED));
+
+      // Production
+      unmotivated = unmotivated.concat(otherPlayer.buildings.production
+        .filter(building => building.motivated === false)
+        .filter(building => building.state !== op.BUILDING_STATE_PLUNDERED)
+        .filter(building => building.state !== op.BUILDING_STATE_PRODUCTION_FINISHED)
+        .filter(building => building.state !== op.BULDING_STATE_UNCONNECTED));
+
+      // Culture
+      let unpolished = [];
+      unpolished = unpolished.concat(otherPlayer.buildings.culture
+        .filter(building => building.polished === false)
+        .filter(building => building.state !== op.BUILDING_STATE_PLUNDERED)
+        .filter(building => building.state !== op.BUILDING_STATE_POLISHED)
+        .filter(building => building.state !== op.BULDING_STATE_UNCONNECTED));
+
+      // Decoration
+      unpolished = unpolished.concat(otherPlayer.buildings.decoration
+        .filter(building => building.polished === false)
+        .filter(building => building.state !== op.BUILDING_STATE_POLISHED)
+        .filter(building => building.state !== op.BUILDING_STATE_PLUNDERED));
+
+      let operation;
+      console.log(`Unmotivated ${unmotivated.length}, Unpolished ${unpolished.length}`)
+      if (unmotivated.length > 0 && unpolished.length > 0) {
+        if (Math.floor(Math.random() * (2)) === 0) {
+          let randomBuilding = Math.floor(Math.random() * (unmotivated.length));
+          console.log(`Motivating Building ${randomBuilding} of ${unmotivated.length}`);
+          return op.motivate(otherPlayerId, unmotivated[randomBuilding], cityEntities[unmotivated[randomBuilding].cityEntityId]);
+        } else {
+          let randomBuilding = Math.floor(Math.random() * (unpolished.length));
+          console.log(`Polishing Building ${randomBuilding} of ${unpolished.length}`);
+          return op.polish(otherPlayerId, unpolished[randomBuilding], cityEntities[unpolished[randomBuilding].cityEntityId]);
         }
-        otherPlayer.buildings[building.type].push(building);
-      });
-
-      // Residential first
-      var unmotivatedBuildings = otherPlayer.buildings.residential.filter(building => {
-        return building.state.is_motivated === false;
-      });
-
-      if (unmotivatedBuildings.length !== 0) {
-        return motivate(otherPlayerId, unmotivatedBuildings[0], cityEntities[unmotivatedBuildings[0].cityentity_id]);
+      } else if (unmotivated.length !== 0) {
+        let randomBuilding = Math.floor(Math.random() * (unmotivated.length));
+        console.log(`Motivating Building ${randomBuilding} of ${unmotivated.length}`);
+        return op.motivate(otherPlayerId, unmotivated[randomBuilding], cityEntities[unmotivated[randomBuilding].cityEntityId]);
+      } else if (unpolished.length !== 0) {
+        let randomBuilding = Math.floor(Math.random() * (unpolished.length));
+        console.log(`Polishing Building ${randomBuilding} of ${unpolished.length}`);
+        return op.polish(otherPlayerId, unpolished[randomBuilding], cityEntities[unpolished[randomBuilding].cityEntityId]);
       }
+      throw new Error('Nothing to do for player');
     })
     .then(results => {
-      console.log(results);
+      console.log(`Successful visit ${otherPlayerId}`);
     })
     .catch(err => {
-      console.error(`Failed to visit ${otherPlayerId}, ${err}`);
+      console.log(`Failed visit ${otherPlayerId}: ${err}`);
     });
 }
 
@@ -121,34 +154,50 @@ commander
     let clanMembers = {};
     getData()
       .then(startupData => {
+
+        // Load the diferent city entities. Buildings, etc.
         startupData.StartupServiceGetData.city_map.city_entities.forEach(entity => {
           cityEntities[entity.id] = entity;
         });
 
+        // Load the list of players.
         startupData.StartupServiceGetData.socialbar_list.forEach(player => {
           visitablePeople[player.player_id] = player;
-        });
-
-        startupData.StartupServiceGetData.city_map.city_entities.forEach(entity => {
-          cityEntities[entity.id] = entity;
         });
 
         return getOwnClanData();
       })
       .then(clanData => {
+
+        // Load clan members
         clanData.ClanServiceGetOwnClanData.members.forEach(member => {
           clanMembers[member.player_id] = member;
           visitablePeople[member.player_id] = member;
         });
 
+        console.log(`Visitable People ${Object.keys(visitablePeople).length}`);
+
+        // Create an array of promises to visit other players.
         let visitPromises = Object.keys(visitablePeople).filter(otherPlayerId => {
+          if (!visitablePeople[otherPlayerId].next_interaction_in) {
+            return true;
+          }
           return visitablePeople[otherPlayerId].next_interaction_in === 0;
         })
         .map(otherPlayerId => {
-          return visit(otherPlayerId, cityEntities);
+          return function() {
+            return visit(otherPlayerId, cityEntities);
+          }
         });
 
-        return Q.allSettled(visitPromises);
+        console.log(`Visitable Promises ${visitPromises.length}`);
+
+        return visitPromises.reduce((thenable, promiseGenerator) => {
+          return thenable
+            .then(results => {
+              return promiseGenerator();
+            });
+        }, Q())
       })
       .then(() => {
         console.log('Done visiting');
@@ -188,6 +237,9 @@ commander
 
           let buildings = cityMap.entities;
           let cityBuildings = new Map();
+          cityBuildings.set(BuildingTypes.GOODS, []);
+          cityBuildings.set(BuildingTypes.RESIDENTIAL, []);
+          cityBuildings.set(BuildingTypes.PRODUCTION, []);
 
           buildings.forEach(building => {
             if (!cityBuildings.has(building.type)) {
@@ -265,6 +317,18 @@ commander
         .then(() => {
           console.log(chalk.green('Collecting complete'));
         });
+  });
+
+commander
+  .command('test')
+  .action(() => {
+     visitPlayer(5531986)
+      .then(results => {
+         console.log(results);
+      })
+      .catch(err => {
+        console.log(err);
+      })
   });
 
 commander.parse(process.argv);
